@@ -1,5 +1,6 @@
 {-# OPTIONS -fplugin=Rattus.Plugin #-}
 {-# LANGUAGE TypeOperators #-}
+{-# LANGUAGE FlexibleInstances #-}
 
 module CatMouse where
 
@@ -10,6 +11,7 @@ import Rattus
 import Rattus.Primitives
 import Rattus.Stream (Str(..))
 import qualified Rattus.Stream as Stream
+import Rattus.Plugin.Annotation
 import Rattus.ToHaskell
 import System.Random
 import Graphics.Gloss.Data.Color
@@ -50,12 +52,14 @@ instance Random Direction where
 
 
 type Point = (Float, Float)
-type World = (Point, Point, Trans (Point :* Direction) (Point :* Point), StdGen)
 
-initial :: StdGen -> World
+-- Mouse pos, Cat pos, State machine ((mouse pos, mouse direction), cat pos), random gen
+type World rng = (Point, Point, Trans ((Point :* Direction) :* Point) (Point :* Point), rng)
+
+initial :: rng -> World rng
 initial gen = ((10,0),(0, 10), runTransducer $ Stream.map $ box newPositions, gen)
 
-render :: World -> Picture
+render :: World rng -> Picture
 render ((xm, ym),(xc, yc),_,_) = 
   Pictures
   [ translate xm ym
@@ -66,6 +70,43 @@ render ((xm, ym),(xc, yc),_,_) =
 -- Screen bounds: top, bottom, left, right
 bounds :: (Float, Float, Float, Float)
 bounds = (250, -250, -250, 250)
+
+inRange :: Float -> Float -> Float -> Bool
+inRange min max f = f < max && f >= min
+
+degrees :: Float -> Float
+degrees = (/pi) . (180*)
+
+closestDirection :: Float -> Direction
+closestDirection degrees
+    | inRange (-22.5) 22.5 degrees = E
+    | inRange 22.5 67.5 degrees = NE
+    | inRange 67.5 112.5 degrees = N
+    | inRange 112.5 157.5 degrees = NW
+    | inRange (-67.5) (-22.5) degrees = SE
+    | inRange (-112.5) (-67.5) degrees = S
+    | inRange (-157.5) (-112.5) degrees = SW
+    | otherwise = W
+
+{-# ANN simpleBestPath NotRattus #-}
+-- Computes a best path simply by calculating the direction most closely matching the angle to other point at each step.
+simpleBestPath :: Point -> Point -> List Direction
+simpleBestPath start@(xs, ys) goal@(xg, yg) 
+    | start == goal = None :! Nil
+    | xd == 0 && yd > 0 = N :! simpleBestPath (move (start :* N)) goal
+    | xd == 0 = S :! simpleBestPath (move (start :* S)) goal
+    | otherwise = go $ closestDirection $ degrees $ atan2 yd xd 
+    where xd = xg - xs
+          yd = yg - ys
+          go d = d :! (simpleBestPath (move (start :* d)) goal)
+
+{-# ANN takeStrict NotRattus #-}
+takeStrict :: Int -> List a -> List a
+takeStrict _ Nil = Nil
+takeStrict n (x :! xs) = if n > 0 then x :! takeStrict (n-1) xs else Nil
+
+walk :: Point -> List Direction -> Int -> Point
+walk p ds n = foldl (\newp d -> move (newp :* d)) p (takeStrict n ds)
 
 mouseDelta :: Direction -> Point
 mouseDelta d =
@@ -83,6 +124,10 @@ mouseDelta d =
 newMousePos :: Point -> Direction -> Point
 newMousePos p d = p .+. mouseDelta d .* 5
 
+-- cat pos, mouse pos, new cat pos
+newCatPos :: Point -> Point -> Point
+newCatPos m c = walk c (simpleBestPath m c) 5
+
 (.+.) :: Point -> Point -> Point
 (x1, y1) .+. (x2, y2) = (x1+x2, y1+y2)
 infixl 6 .+.
@@ -91,12 +136,13 @@ infixl 6 .+.
 (x, y) .* k = (k*x, k*y)
 infixl 7 .*
 
-newPositions :: (Point :* Direction) -> (Point :* Point)
-newPositions m = (newMouse :* (0,0))
-    where newMouse = applyDelta m
+newPositions :: ((Point :* Direction) :* Point) -> (Point :* Point)
+newPositions (m :* c) = (newMouse :* newCat)
+    where newMouse = move m
+          newCat   = newCatPos c newMouse
 
-applyDelta :: (Point :* Direction) -> Point
-applyDelta (p :* d)
+move :: (Point :* Direction) -> Point
+move (p :* d)
     | isInBounds newMouse = newMouse
     | isInBounds reverseD = reverseD
     | isInBounds rotatedD = rotatedD
@@ -114,11 +160,11 @@ isInBounds (x, y)
     | otherwise = True
     where (t, b, l, r) = bounds
 
-step :: ViewPort -> Float -> World -> World
+step :: (RandomGen rng) => ViewPort -> Float -> World rng -> World rng
 step _ _ (m,c, Trans st, gen) =  
     (m', c', st', gen')
     where (randomDirection, gen') = random gen
-          ((m' :* c'), st') = st (m :* randomDirection)
+          ((m' :* c'), st') = st ((m :* randomDirection) :* c)
                   
 {-
 catmouse :: Str RandomGen -> Str (Point :* Point, RandomGen)
