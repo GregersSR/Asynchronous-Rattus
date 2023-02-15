@@ -63,9 +63,11 @@ render :: World rng -> Picture
 render ((xm, ym),(xc, yc),_,_) = 
   Pictures
   [ translate xm ym
-    (Color white (ThickCircle 3 6))
+    (Color jerryColor (ThickCircle 3 6))
   , translate xc yc
-    (Color red (ThickCircle 4 7))]
+    (Color tomColor (ThickCircle 4 7))]
+  where tomColor = greyN 0.5
+        jerryColor = makeColorI 192 129 41 255
 
 -- Screen bounds: top, bottom, left, right
 bounds :: (Float, Float, Float, Float)
