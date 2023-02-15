@@ -93,12 +93,12 @@ closestDirection degrees
 simpleBestPath :: Point -> Point -> List Direction
 simpleBestPath start@(xs, ys) goal@(xg, yg) 
     | start == goal = None :! Nil
-    | xd == 0 && yd > 0 = N :! simpleBestPath (move (start :* N)) goal
-    | xd == 0 = S :! simpleBestPath (move (start :* S)) goal
+    | xd == 0 && yd > 0 = N :! simpleBestPath (move (start :* N) 1) goal
+    | xd == 0 = S :! simpleBestPath (move (start :* S) 1) goal
     | otherwise = go $ closestDirection $ degrees $ atan2 yd xd 
     where xd = xg - xs
           yd = yg - ys
-          go d = d :! (simpleBestPath (move (start :* d)) goal)
+          go d = d :! (simpleBestPath (move (start :* d) 1) goal)
 
 {-# ANN takeStrict NotRattus #-}
 takeStrict :: Int -> List a -> List a
@@ -106,10 +106,10 @@ takeStrict _ Nil = Nil
 takeStrict n (x :! xs) = if n > 0 then x :! takeStrict (n-1) xs else Nil
 
 walk :: Point -> List Direction -> Int -> Point
-walk p ds n = foldl (\newp d -> move (newp :* d)) p (takeStrict n ds)
+walk p ds n = foldl (\newp d -> move (newp :* d) 1) p (takeStrict n ds)
 
-mouseDelta :: Direction -> Point
-mouseDelta d =
+delta :: Direction -> Point
+delta d =
     case d of
     None -> (0,   0)
     N    -> (0,   1)
@@ -121,12 +121,12 @@ mouseDelta d =
     W    -> (-1,  0)
     NW   -> (-1,  1)
 
-newMousePos :: Point -> Direction -> Point
-newMousePos p d = p .+. mouseDelta d .* 5
+newMousePos :: (Point :* Direction) -> Point
+newMousePos m = move m 20
 
 -- cat pos, mouse pos, new cat pos
 newCatPos :: Point -> Point -> Point
-newCatPos m c = walk c (simpleBestPath m c) 5
+newCatPos c m = walk c (simpleBestPath c m) 5
 
 (.+.) :: Point -> Point -> Point
 (x1, y1) .+. (x2, y2) = (x1+x2, y1+y2)
@@ -138,18 +138,21 @@ infixl 7 .*
 
 newPositions :: ((Point :* Direction) :* Point) -> (Point :* Point)
 newPositions (m :* c) = (newMouse :* newCat)
-    where newMouse = move m
+    where newMouse = newMousePos m
           newCat   = newCatPos c newMouse
 
-move :: (Point :* Direction) -> Point
-move (p :* d)
-    | isInBounds newMouse = newMouse
+moveSimple :: (Point :* Direction) -> Float -> Point
+moveSimple (p :* d) k = p .+. delta d .* k
+
+move :: (Point :* Direction) -> Float -> Point
+move mv@(p :* d) k
+    | isInBounds newPos = newPos
     | isInBounds reverseD = reverseD
     | isInBounds rotatedD = rotatedD
-    | otherwise = newMousePos p $ reverseDirection $ rotateClockwise d
-    where newMouse = newMousePos p d
-          reverseD = newMousePos p $ reverseDirection d
-          rotatedD = newMousePos p $ rotateClockwise d
+    | otherwise = moveSimple (p :* (reverseDirection $ rotateClockwise d)) k
+    where newPos = moveSimple mv k
+          reverseD = moveSimple (p :* reverseDirection d) k
+          rotatedD = moveSimple (p :* rotateClockwise d) k
 
 isInBounds :: Point -> Bool
 isInBounds (x, y)
