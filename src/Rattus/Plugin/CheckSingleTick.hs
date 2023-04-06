@@ -226,19 +226,28 @@ showMaybePrimExpr mpe = case mpe of
   Nothing -> text "Nothing"
 
 isPrimExpr :: Ctx -> Expr Var -> Maybe (Prim, Var, [Expr Var])
-isPrimExpr c (App (App f arg1) arg2) =
-  case let r = (isPrimExpr c f) in D.trace ("Double-App: " ++ showSDocUnsafe (showMaybePrimExpr r <> text " | " <> ppr f)) r of
-    Just (Select, v, []) -> D.trace "Yep, it's a select" (Just (Select, v, [arg1, arg2]))
-    x -> x
-isPrimExpr c (App e (Type _)) = isPrimExpr c e
-isPrimExpr c (App e e') | not $ tcIsLiftedTypeKind $ typeKind $ exprType e' = case isPrimExpr c e of
-  Just (p, v, []) -> Just (p, v, [e'])
-  x -> x
-isPrimExpr c (Var v) = fmap (,v, []) (isPrim c v)
-isPrimExpr c (Tick _ e) = isPrimExpr c e
-isPrimExpr c (Lam v e)
-  | isTyVar v || (not $ tcIsLiftedTypeKind $ typeKind $ varType v) = isPrimExpr c e
-isPrimExpr _ _ = Nothing
+isPrimExpr ctx e = case D.trace (showTree e) isPrimExpr' ctx e of
+  Just res@(Select, _ , [arg1, arg2]) -> Just res
+  Just res@(_, _, [arg]) -> Just res
+  Just (_,_, args) -> D.trace ("The list of arguments is not the correct size" ++ show (length args)) Nothing
+  Nothing -> D.trace "(NOTHING) Is not a prim" Nothing
+
+isPrimExpr' :: Ctx -> Expr Var -> Maybe (Prim, Var, [Expr Var])
+--isPrimExpr c expr@(App (App f arg1) arg2) | D.trace ("big expr: " ++ showPprUnsafe (ppr expr) ++ " f: " ++ showPprUnsafe (ppr f) ++ " arg1: " ++ showPprUnsafe (ppr arg1) ++ " arg2 " ++ showPprUnsafe (ppr arg2) ) isJust var = D.trace "Yep, it's a select" (Just (Select, fromJust var, [arg1, arg2]))
+--  where 
+--    var = case isPrimExpr c f of 
+--      Just (Select, v, []) -> Just v
+--      _ -> Nothing
+isPrimExpr' c (App e (Type _)) = isPrimExpr' c e
+isPrimExpr' c (App e e') | not $ tcIsLiftedTypeKind $ typeKind $ exprType e' = case D.trace ("Expression normal app : " ++ showPprUnsafe (ppr e) ++ " e': " ++ showPprUnsafe (ppr e')) isPrimExpr' c e of
+  Just (p, v, args) -> let r = Just (p, v, args ++ [e']) in D.trace ("return res: p:" ++ showPprUnsafe (ppr p) ++ " v: " ++ showPprUnsafe (ppr v) ++ " args: " ++ showPprUnsafe (ppr args))  r
+  _ -> D.trace ("Could be adv: " ++ showPprUnsafe (ppr e') )isPrimExpr' c e' 
+isPrimExpr' c (Var v) = fmap (,v, []) (isPrim c v)
+isPrimExpr' c (Tick _ e) = isPrimExpr' c e
+isPrimExpr' c (Cast e _) = isPrimExpr' c e
+isPrimExpr' c (Lam v e)
+  | isTyVar v || (not $ tcIsLiftedTypeKind $ typeKind $ varType v) = isPrimExpr' c e
+isPrimExpr' _ _ = Nothing
 
 
 stabilizeLater :: Ctx -> Ctx
@@ -396,10 +405,10 @@ checkAndUpdate c e = fmap (updateCtxFromResult c) (countAdvSelect' c e)
 -- called on the subtree to which a delay is applied
 countAdvSelect' :: Ctx -> Expr Var -> Either String CheckResult
 countAdvSelect' ctx (App e e') = case isPrimExpr ctx e of
-      Just (p, _, args) -> case D.trace ("we have met a prim: " ++ showSDocUnsafe (ppr p)) p of
-        Adv | not (isVar e') -> Left "Can only adv on variables"
+      Just (p, _, args) -> case D.trace ("we have met a prim: " ++ showSDocUnsafe (ppr p) ++ " arguments: " ++ showPprUnsafe (ppr args)) p of
+        Adv | not (isVar (head args)) -> Left "Can only adv on variables"
             | hasSeenAdvSelect ctx -> Left "Only one adv/select allowed in a delay"
-            | otherwise -> Right CheckResult { foundClock = Just (Clock (getVar e')) }
+            | otherwise -> Right CheckResult { foundClock = Just (Clock (getVar (head args))) }
         Select | not $ all isVar args -> Left "Can only select on variables"
                     | hasSeenAdvSelect ctx -> Left "Only one adv/select allowed in a delay"
                     | otherwise -> Right CheckResult { foundClock = let [first, second] = map (Clock . getVar) args in Just $ Union first second}

@@ -59,9 +59,6 @@ import Data.Char
 import Data.Maybe
 
 getMaybeVar :: CoreExpr -> Maybe Var
-getMaybeVar (App e e')
-  | isType e' || not  (tcIsLiftedTypeKind(typeKind (exprType e'))) = getMaybeVar e
-  | otherwise = Nothing
 getMaybeVar (Cast e _) = getMaybeVar e
 getMaybeVar (Tick _ e) = getMaybeVar e
 getMaybeVar (Var v) = Just v
