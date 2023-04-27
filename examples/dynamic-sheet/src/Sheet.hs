@@ -21,7 +21,7 @@ import Expr
 type Cell = String
 data CellUpdate = NewFormula Expr | UpdatedDependency (Cell, Maybe Int)
 
-type Input = Int
+type Input = UpdateInputCell Int | SetOutputCell Expr
 type O a = Prim.O Input a
 type Stream a = Str Input a
 type InputChannel = Channels.InputChannel Input
@@ -32,19 +32,74 @@ type InputChannel = Channels.InputChannel Input
 --type Cell f = (String, f, O Int)
 --type Spreadsheet = Map String Cell
 
-inputCells = ["A1", "A2", "B1", "B2"]
+type Cell = String
 
-(input, inputMaybe, depend, channels) = mkChannels inputCells
+cells = ["C1", "A3", "A1", "A2", "B1", "B2"]
 
-([a1, a2, b1, b2]) = map Stream.fromLater channels
+(input, inputMaybe, depend, c1 : a3 : inputChannels) = mkChannels inputCells
 
-c1 :: Stream Int
+inputChannelStrs :: [O (Str Int)]
+inputChannelStrs = map (Stream.fromLater . (Later.map (\UpdateInputCell i -> i))) inputChannels
+
+setOutputChannels :: (O (Str Expr), O (Str Expr))
+setOutputChannels = (mkStr c1, mkStr a3)
+    where mkStr = Stream.fromLater . Later.map (\SetOutputCell e -> e)
+
+cellToInputChannel :: Map Cell InputChannel
+cellToInputChannel = Map.fromList $ zip inputCells inputChannel
+
+c1 :: Stream (Maybe Int)
 c1 = Stream.zipWithAwait (box (+)) a1 b1 0 0
 
-a3 :: Stream Int
+a3 :: Stream (Maybe Int)
 a3 = Stream.zipWithAwait (box (+)) a1 a2 0 0
 
-miniSheet :: Stream (Int :* Int)
+-- Given a list of cell streams, produces as stream of corresponding variable environments
+varEnv :: List (O (Stream (Cell, Maybe Int))) -> VarEnv -> O (Stream VarEnv)
+varEnv delayedStreams prevEnv = delay (
+        let updatedStreams = adv (Later.selectMany delayedStreams)
+            updatedIndices = Strict.map' fst updatedStreams
+            staleStreams = removeIndices updatedIndices delayedStreams
+            strs = Strict.map' snd updatedStreams
+            updates = Strict.map' (Stream.hd) strs
+            newEnv = updateVarEnv updates prevEnv
+            newStrs = Strict.map' (Stream.tl) strs
+        in newEnv ::: varEnv (staleStreams +++ newStrs) newEnv
+    )
+    where
+        fold acc (cell, value) = Map.insert cell value acc
+
+{-
+outputCell :: Expr -> Map Cell InputChannel -> O (Stream (Maybe Int))
+outputCell e cellToChannel = delay (
+        let updatedStreams = adv (Later.selectMany delayedStreams)
+            updatedIndices = Strict.map' fst updatedStreams
+            staleStreams = removeIndices updatedIndices delayedStreams
+            strs = Strict.map' snd updatedStreams
+            updates = Strict.map' (Stream.hd) strs
+            newEnv = updateVarEnv updates prevEnv
+            newStrs = Strict.map' (Stream.tl) strs
+
+    )
+    where dependCells = depends e
+          dependChannels = Map.foldWithKey (\k v acc -> if k `elem` dependsCells then v :! acc else acc) Nil cellToChannel
+          lUpdatedStreams = Later.selectMany dependChannels
+-}
+
+outputCell :: Expr -> Map Cell InputChannel -> O (Stream (Maybe Int))
+outputCell e cellToChannel = delay (
+
+    )
+    where dependCells = depends e
+          dependChannels = Map.foldWithKey (\k v acc -> if k `elem` dependsCells then v :! acc else acc) Nil cellToChannel
+          lUpdatedStreams = Later.selectMany dependChannels
+
+outputCell' :: Expr -> List (O (Stream (Maybe Int))) -> Stream (Maybe Int)
+outputCell' e dependencies = Stream.map (evalMaybe e) varEnvStr
+    where varEnvStr = varEnv dependencies emptyVarEnv
+
+
+miniSheet :: Stream (Maybe Int :* Maybe Int)
 miniSheet = Stream.zip c1 a3
 
 --------------------------------------------------------------------
@@ -111,15 +166,6 @@ spreadSheet' (updates ::: updateStr) = undefined
 
 cell :: Expr -> Stream VarEnv -> Stream (Maybe Int)
 cell e = Stream.map (evalMaybe e)
-
--- assume we know this expr has no dependencies
-constCell :: Expr -> Stream (Maybe Int)
-constCell = Stream.const . flip evalMaybe (emptyVarEnv)
-
--- assume this expr has a single dependency
-singleDependencyCell :: Expr -> O (Stream (Maybe Int)) -> Stream (Maybe Int)
-singleDependencyCell e dependency = Stream.map (evalMaybe e) varEnvStr
-    where varEnvStr = varEnv (Strict.singleton dependency) emptyVarEnv
 
 -- assume this expr has a single dependency
 cell :: Expr -> List (O (Stream (Maybe Int))) -> Stream (Maybe Int)
