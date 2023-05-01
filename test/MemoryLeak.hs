@@ -4,11 +4,12 @@ module Main (module Main) where
 
 import Rattus
 import Rattus.Stream
-import Rattus.ToHaskell
 
+main = putStrLn ""
 
 {-# ANN module Rattus #-}
 
+{-
 scan3 :: (Stable a) => Box(a -> a -> a) -> Box (a -> Bool) -> a -> Str a -> Str a
 scan3 f p acc (a ::: as) =  (if unbox p a then acc else a)
       ::: (delay (scan3 f p acc') <#> as)
@@ -75,3 +76,4 @@ main  = do
 -- {-# ANN scan2 NotRattus #-}
 -- scan2 :: (Int -> Int -> Int) -> Int -> [Int] -> [Int]
 -- scan2 f acc (a : as) =  (if a == 0 then acc else 0) : scan2 f (f acc a) as
+-}

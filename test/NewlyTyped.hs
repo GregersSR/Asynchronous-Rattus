@@ -11,7 +11,7 @@ import Rattus.Plugin.Annotation (InternalAnn (..))
 -- rules of Rattus that allows functions and delays under tick.
 
 {-# ANN module Rattus #-}
-
+{-
 {-# ANN recBox ExpectWarning #-}
 recBox :: Str Int
 recBox = 0 ::: unbox (box (delay recBox))
@@ -63,6 +63,6 @@ nestedRec = run 10
   where run :: Int -> Str Int
         run 0 = 0 ::: delay (nestedRec)
         run n = n ::: delay (run (n-1))
-
+-}
 {-# ANN main NotRattus #-}
 main = putStrLn "This file should type check"

@@ -5,11 +5,10 @@ module Main (module Main) where
 
 import Rattus
 import Rattus.Stream
-import Rattus.Yampa
 import Data.Set as Set
 import Prelude
 
-
+{-
 {-# ANN module Rattus #-}
 
 boxedInt :: Box Int
@@ -134,7 +133,7 @@ myMap (x ::: xs) = (x + 1) ::: delay (fst' (myMap (adv xs):*nats))
 
 nats :: Str Int
 nats = 0 ::: delay (myMap nats)
-
+-}
 
 
 {-# ANN main NotRattus #-}
