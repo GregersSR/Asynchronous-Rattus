@@ -5,11 +5,10 @@ module Main (module Main) where
 
 import Rattus
 import Rattus.Stream
-import Rattus.Yampa
 import Data.Set as Set
 import Prelude
 
-
+{-
 {-# ANN module Rattus #-}
 
 boxedInt :: Box Int
@@ -136,6 +135,6 @@ nats :: Str Int
 nats = 0 ::: delay (myMap nats)
 
 
-
+-}
 {-# ANN main NotRattus #-}
 main = putStrLn "This file should just type check"

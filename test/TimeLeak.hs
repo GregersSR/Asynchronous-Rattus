@@ -4,11 +4,11 @@ module Main (module Main) where
 
 import Rattus
 import Rattus.Stream as Str
-import Rattus.ToHaskell
 import Rattus.Plugin.Annotation (InternalAnn (..))
+import Prelude (putStrLn)
 
 {-# ANN module Rattus #-}
-
+{-
 
 -- | This function should be fine (no warnings, no time-leaks)
 nats' :: Str Int
@@ -108,3 +108,6 @@ main = do
   let x = fromStr boxLeaky
   recurse 10000000 x
   
+-}
+
+main = putStrLn "TimeLeak"

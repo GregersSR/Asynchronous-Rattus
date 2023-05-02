@@ -167,7 +167,7 @@ Test-Suite memory-leak
   hs-source-dirs:      test
   default-language:    Haskell2010
   build-depends:       Rattus, base
-  ghc-options:         -fplugin=Rattus.Plugin -rtsopts
+  ghc-options:         -fplugin=Rattus.Plugin -fplugin-opt Rattus.Plugin:debug -rtsopts
 
 
 Test-Suite time-leak
@@ -176,22 +176,22 @@ Test-Suite time-leak
   hs-source-dirs:      test
   default-language:    Haskell2010
   build-depends:       Rattus, base
-  ghc-options:         -fplugin=Rattus.Plugin -rtsopts
+  ghc-options:         -fplugin=Rattus.Plugin -fplugin-opt Rattus.Plugin:debug -rtsopts
   
 Test-Suite ill-typed
   type:                exitcode-stdio-1.0
-  main-is:             test/IllTyped.hs
+  main-is:             test/IllTypedDriver.hs
   default-language:    Haskell2010
-  build-depends:       Rattus, base
+  build-depends:       Rattus, base, ghc, ghc-paths, exceptions
   ghc-options:         
-                       -fplugin=Rattus.Plugin -rtsopts
+                       -fplugin=Rattus.Plugin -fplugin-opt Rattus.Plugin:debug -rtsopts
 
 Test-Suite newly-typed
   type:                exitcode-stdio-1.0
   main-is:             test/NewlyTyped.hs
   default-language:    Haskell2010
   build-depends:       Rattus, base
-  ghc-options:         -fplugin=Rattus.Plugin
+  ghc-options:         -fplugin=Rattus.Plugin -fplugin-opt Rattus.Plugin:debug
 
 
 Test-Suite well-typed
@@ -200,7 +200,7 @@ Test-Suite well-typed
   hs-source-dirs:      test
   default-language:    Haskell2010
   build-depends:       Rattus, base, containers
-  ghc-options:         -fplugin=Rattus.Plugin -rtsopts
+  ghc-options:         -fplugin=Rattus.Plugin -fplugin-opt Rattus.Plugin:debug -rtsopts
 
 
 Test-Suite rewrite
@@ -209,5 +209,5 @@ Test-Suite rewrite
   hs-source-dirs:      test
   default-language:    Haskell2010
   build-depends:       Rattus, base, containers
-  ghc-options:         -fplugin=Rattus.Plugin -rtsopts
+  ghc-options:         -fplugin=Rattus.Plugin -fplugin-opt Rattus.Plugin:debug -rtsopts
 
