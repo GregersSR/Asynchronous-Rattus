@@ -1,3 +1,5 @@
+{-# OPTIONS -fplugin=Rattus.Plugin #-}
+
 module Main where
 
 import Rattus
