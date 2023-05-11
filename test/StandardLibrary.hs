@@ -309,6 +309,7 @@ strictTests = TestLabel "Strict tests" $ TestList [toFromListTests, initTests, r
 
 allTests = TestList [laterTests, streamTests, strictTests]
 
+{-# ANN main NotRattus #-}
 main :: IO ()
 main = do
     counts <- runTestTT allTests
